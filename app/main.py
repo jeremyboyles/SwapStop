@@ -33,7 +33,7 @@ def read_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     return users
 
 
-@app.delete("/users/{user_id}", status_code=204)
+@app.delete("/users/{user_id}", status_code=200)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     deleted = crud.delete_user(db, user_id=user_id)
     if not deleted:
