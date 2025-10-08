@@ -35,8 +35,8 @@ npm -v
 ```
 To Run UI Element:
 ```bash
-git clone <frontend-repo-url> swapstop-frontend
-cd swapstop-frontend
+git clone <frontend-repo-url> frontend
+cd frontend
 npm install
 npm run dev
 ```
