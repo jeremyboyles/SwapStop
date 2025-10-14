@@ -1,16 +1,16 @@
 :root{
-  --bg:#30422E;        /* page background = dark green */
-  --panel:#FEFEFE;     /* cards & header = white */
-  --text:#040603;      /* dark text on white cards */
-  --accent:#0D130E;    /* button / outline color */
-  --line:#0D130E33;    /* subtle borders (30% opacity) */
+  --bg:#30422E;        
+  --panel:#FEFEFE;     
+  --text:#040603;     
+  --accent:#0D130E;    
+  --line:#0D130E33;    
 }
 
 
 
 *{box-sizing:border-box}
 html, body, #root {
-  background: var(--bg);      /* dark green page background */
+  background: var(--bg);      
   min-height: 100%;
 }
 
@@ -20,7 +20,7 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'JejuGothic', sans-serif;
 }
 .card, .header {
-  background: var(--panel);   /* white for cards and header */
+  background: var(--panel);   
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -82,7 +82,7 @@ a{color:var(--text);text-decoration:none}
   padding:10px;
   border-radius:12px;
   border:1px solid var(--line);
-  background:#061108;        /* slightly lighter than bg for depth */
+  background:#061108;        
   color:var(--text);
 }
 .lbl{display:block;margin:8px 0 6px 0;font-size:14px;opacity:.9}
@@ -112,4 +112,3 @@ a{color:var(--text);text-decoration:none}
 }
 .muted{opacity:.8}
 .footer{opacity:.7;text-align:center;padding:20px}
-
