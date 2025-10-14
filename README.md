@@ -35,10 +35,18 @@ npm -v
 ```
 To Run UI Element:
 ```bash
-git clone <frontend-repo-url> swapstop-frontend
-cd swapstop-frontend
+git clone <frontend-repo-url> frontend
+cd frontend
 npm install
 npm run dev
 ```
 Follow link: "http://localhost:5173"
 
+## Running UI Tests
+
+To run simple UI test, run the following command:
+
+```bash
+npm run test
+```
+This test starts the app in a test browser, looks at the header area and verifies it has the site’s brand name. Then, checks that the navigation bar has the three key buttons. The test fails if any of these elements are missing or mislabeled.
