@@ -1,52 +1,12 @@
-# SwapStop
+# React + Vite
 
-Clone the repository:
-```git clone https://github.com/jeremyboyles/SwapStop.git SwapStop```
-```Cd SwapStop```
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-Install dependencies:
-```pip install -r requirements.txt```
-or
-```pip3 install -r requirements.txt```
+Currently, two official plugins are available:
 
-Running the server:
-Run the server using ```uvicorn app.main:app --reload```
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-Access the API:
-```http://127.0.0.1:8000/docs```<br>
+## Expanding the ESLint configuration
 
-
-
-# SwapStop Frontend (React)
-
-
-## Prerequisites
-
-Before running the UI, make sure you have the following installed:
-
-- [Node.js](https://nodejs.org/) (v18 or later recommended)
-- [npm](https://www.npmjs.com/) (comes with Node.js)
-
-Check installation with:
-
-```bash
-node -v
-npm -v
-```
-To Run UI Element:
-```bash
-git clone <frontend-repo-url> frontend
-cd frontend
-npm install
-npm run dev
-```
-Follow link: "http://localhost:5173"
-
-## Running UI Tests
-
-To run simple UI test, run the following command:
-
-```bash
-npm run test
-```
-This test starts the app in a test browser, looks at the header area and verifies it has the site’s brand name. Then, checks that the navigation bar has the three key buttons. The test fails if any of these elements are missing or mislabeled.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
