@@ -1,7 +1,0 @@
-fastapi
-uvicorn (might need to install uvicorn[standard] specifically)
-sqlalchemy 
-pydantic
-alembic
-passlib
-bcrypt
