@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+<<<<<<< HEAD
 import Chat from "./components/Chat";
+=======
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
 
 /**
  * SwapStop — React Skeleton (simple, single-file UI)
@@ -123,6 +126,7 @@ function HomeSkeleton() {
 }
 
 function Users() {
+<<<<<<< HEAD
   const [users, setUsers] = useState([]);
   const [skip, setSkip] = useState(0);
   const [limit, setLimit] = useState(10);
@@ -321,6 +325,133 @@ function Users() {
   );
 }
 
+=======
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("");
+
+  if (showSignUp) {
+    return <SignUpPage onBackToLogin={() => setShowSignUp(false)} />;
+  }
+
+  if (showForgot) {
+    return <ForgotPasswordPage onBackToLogin={() => setShowForgot(false)} />;
+  }
+
+  return (
+    <div className="login-wrapper">
+      <Section title="Login to SwapStop">
+        <Input
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Input
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <div className="actions">
+          <button className="btn" onClick={() => setStatus("Login button clicked")}>
+            Login
+          </button>
+          <button className="btn outline" onClick={() => setShowForgot(true)}>
+            Forgot Password?
+          </button>
+        </div>
+
+        {status && <p className="muted">{status}</p>}
+      </Section>
+
+      <Section>
+        <p className="muted">
+          Don’t have an account?{" "}
+          <button className="btn outline" onClick={() => setShowSignUp(true)}>
+            Sign up here
+          </button>
+        </p>
+      </Section>
+    </div>
+  );
+}
+
+
+
+function ForgotPasswordPage({ onBackToLogin }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("");
+
+  const handleReset = () => {
+    if (!email) {
+      setStatus("Please enter your email to reset password.");
+    } else {
+      // Placeholder: replace with actual API call
+      setStatus(`Password reset link sent to ${email}.`);
+    }
+  };
+
+  return (
+    <div className="forgot-wrapper">
+      <Section title="Reset Your Password">
+        <Input
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <div className="actions">
+          <button className="btn" onClick={handleReset}>
+            Send Reset Link
+          </button>
+          <button className="btn outline" onClick={onBackToLogin}>
+            Back to Login
+          </button>
+        </div>
+        {status && <p className="muted">{status}</p>}
+      </Section>
+    </div>
+  );
+}
+
+
+
+function SignUpPage({ onSignUp, onBackToLogin }) {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("");
+
+  return (
+    <div className="signup-wrapper">
+      <Section title="Create an Account">
+        <Input label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+        <div className="actions">
+          <button className="btn" onClick={() => { setStatus("Sign Up clicked"); onSignUp(); }}>
+            Sign Up
+          </button>
+          <button className="btn outline" onClick={onBackToLogin}>
+            Back to Login
+          </button>
+        </div>
+
+        {status && <p className="muted">{status}</p>}
+      </Section>
+    </div>
+  );
+}
+
+
+
+
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
 function Items() {
   const [items, setItems] = useState([]);
   const [skip, setSkip] = useState(0);
@@ -382,7 +513,10 @@ function Items() {
 
 export default function App() {
   const [tab, setTab] = useState("home");
+<<<<<<< HEAD
   const [showChat, setShowChat] = useState(false);
+=======
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
 
   useEffect(() => {
     // default to home
@@ -397,6 +531,7 @@ export default function App() {
           <TabButton active={tab === "home"} onClick={() => setTab("home")}>Home</TabButton>
           <TabButton active={tab === "users"} onClick={() => setTab("users")}>Users</TabButton>
           <TabButton active={tab === "items"} onClick={() => setTab("items")}>Items</TabButton>
+<<<<<<< HEAD
       {/* Floating Chat Button */}
       <button
         className="btn"
@@ -420,6 +555,8 @@ export default function App() {
       >
         Chat
       </button>
+=======
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
         </nav>
       </header>
 
@@ -428,6 +565,7 @@ export default function App() {
         {tab === "users" && <Users />}
         {tab === "items" && <Items />}
 
+<<<<<<< HEAD
         {showChat && (
           <div
             style={{
@@ -455,6 +593,8 @@ export default function App() {
           </div>
         )}
 
+=======
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
         <section className="card">
           <pre className="muted" style={{ whiteSpace: "pre-wrap" }}>
             {/* Status/debug area (optional). */} 

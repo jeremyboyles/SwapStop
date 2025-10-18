@@ -10,6 +10,7 @@ Currently, two official plugins are available:
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+<<<<<<< HEAD
 
 SwapStop
 Clone the repository: git clone https://github.com/jeremyboyles/SwapStop.git SwapStop Cd SwapStop
@@ -38,3 +39,5 @@ npm install
 npm install lucide-react
 npm run dev
 Follow link: "http://localhost:5173"
+=======
+>>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
