@@ -79,7 +79,7 @@ def read_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
 def read_current_user(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@app.delete("/users/{user_id}", status_code=204)
+@app.delete("/users/{user_id}", status_code=200)
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # only allow users to delete their own account (or extend for admin)
     if current_user.id != user_id:
