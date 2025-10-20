@@ -14,6 +14,9 @@ class User(Base):
 
     items = relationship("Item", back_populates="owner", cascade="all, delete-orphan")
 
+    proposed_trades = relationship("Trade", back_populates="proposer", foreign_keys="[Trade.proposer_id]")
+    received_trades = relationship("Trade", back_populates="responder", foreign_keys="[Trade.responder_id]")
+
 class Item(Base):
     __tablename__ = "items"
     id = Column(Integer, primary_key=True, index=True)
@@ -23,6 +26,9 @@ class Item(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="items")
+
+    proposed_in_trades = relationship("Trade", back_populates="proposer_item", foreign_keys="Trade.proposer_item_id")
+    responded_in_trades = relationship("Trade", back_populates="responder_item", foreign_keys="Trade.responder_item_id")
 
 class TradeStatus(enum.Enum):
     pending = "pending"
@@ -40,6 +46,8 @@ class Trade(Base):
     status = Column(Enum(TradeStatus), default=TradeStatus.pending, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # optional relationships for convenience
-    proposer = relationship("User", foreign_keys=[proposer_id])
-    responder = relationship("User", foreign_keys=[responder_id])
+    proposer = relationship("User", foreign_keys=[proposer_id], back_populates="proposed_trades")
+    responder = relationship("User", foreign_keys=[responder_id], back_populates="received_trades")
+
+    proposer_item = relationship("Item", back_populates="proposed_in_trades", foreign_keys=[proposer_item_id])
+    responder_item = relationship("Item", back_populates="responded_in_trades", foreign_keys=[responder_item_id])
