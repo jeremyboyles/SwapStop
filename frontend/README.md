@@ -10,34 +10,3 @@ Currently, two official plugins are available:
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-<<<<<<< HEAD
-
-SwapStop
-Clone the repository: git clone https://github.com/jeremyboyles/SwapStop.git SwapStop Cd SwapStop
-
-Install dependencies: pip install -r requirements.txt or pip3 install -r requirements.txt
-
-Running the server: Run the server using uvicorn app.main:app --reload
-
-Access the API: http://127.0.0.1:8000/docs
-
-SwapStop Frontend (React)
-Prerequisites
-Before running the UI, make sure you have the following installed:
-
-Node.js (v18 or later recommended)
-npm (comes with Node.js)
-Check installation with:
-
-node -v
-npm -v
-To Run UI Element:
-
-git clone <frontend-repo-url> swapstop-frontend
-cd swapstop-frontend
-npm install
-npm install lucide-react
-npm run dev
-Follow link: "http://localhost:5173"
-=======
->>>>>>> 50e0681a21398ae2fb734db0c6ce9f759dda7afc
