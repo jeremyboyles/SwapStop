@@ -37,9 +37,3 @@ npm install
 npm install lucide-react
 npm run dev
 Follow link: "http://localhost:5173"
-
-
-```bash
-npm run test
-```
-This test starts the app in a test browser, looks at the header area and verifies it has the site’s brand name. Then, checks that the navigation bar has the three key buttons. The test fails if any of these elements are missing or mislabeled.
