@@ -1,16 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
-import { User } from "lucide-react";
-import {
-  listUsers,
-  createUser,
-  deleteUser as deleteUserApi,
-  listItems,
-  createItemForUser,
-  deleteItem as deleteItemApi,
-  listUserItems,
-} from "./lib/api";
 
+// static demo items for Home page
 const sampleItems = [
   { id: 1, title: "Red Chair", price: 99.99, image: "/images/item1.jpg", description: "Comfortable red chair." },
   { id: 2, title: "Blue Lamp", price: 49.99, image: "/images/item2.jpg", description: "Outdoor lamp." },
@@ -20,45 +11,93 @@ const sampleItems = [
   { id: 6, title: "Coffee Mug", price: 14.99, image: "/images/item6.jpg", description: "Ceramic coffee mug." },
 ];
 
-function Section({ title, children }) {
-  return (
-    <section className="card">
-      {title ? <h2>{title}</h2> : null}
-      {children}
-    </section>
-  );
+
+
+const RAW_BASE = import.meta.env.VITE_API_BASE ?? "";
+const USING_PROXY = RAW_BASE === "";
+
+// If using proxy, keep same-origin and add '/api'. If using explicit base, DO NOT add '/api'.
+const API_BASE = USING_PROXY ? "" : RAW_BASE.replace(/\/+$/, "");
+const API_PREFIX = USING_PROXY ? "/api" : ""; // proxy only triggers on /api
+
+async function api(path, options = {}) {
+  const normalized = (path.startsWith("/") ? path : `/${path}`);
+  const url = `${API_BASE}${API_PREFIX}${normalized}`;
+
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    ...options,
+  });
+
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw || null; }
+
+  if (!res.ok) {
+    const detail = typeof data === "string" ? data : JSON.stringify(data);
+    throw new Error(`[${res.status} ${res.statusText}] ${detail} @ ${url}`);
+  }
+  return data;
 }
 
-function Input({ label, ...props }) {
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState("home");
+  const [user, setUser] = useState(null); // lifted auth state
+
   return (
-    <div>
-      {label ? <label className="lbl">{label}</label> : null}
-      <input className="input" {...props} />
+    <div className="page">
+      <header className="header">
+        <div className="brand">SwapStop</div>
+        <nav className="nav">
+          <button className={activeTab === "home" ? "tab active" : "tab"} onClick={() => setActiveTab("home")}>
+            Home
+          </button>
+          <button className={activeTab === "account" ? "tab active" : "tab"} onClick={() => setActiveTab("account")}>
+            Account
+          </button>
+          <button className={activeTab === "items" ? "tab active" : "tab"} onClick={() => setActiveTab("items")}>
+            Items
+          </button>
+        </nav>
+      </header>
+
+      <main className="wrap">
+        {activeTab === "home" && <Home user={user} />}
+        {activeTab === "account" && (
+          <Account
+            user={user}
+            onLogin={(u) => { setUser(u); setActiveTab("home"); }}    // go Home after login
+            onLogout={() => { setUser(null); setActiveTab("home"); }} // go Home after logout/delete
+          />
+        )}
+        {activeTab === "items" && <Items />}
+      </main>
     </div>
   );
 }
 
-function TabButton({ active, onClick, children }) {
-  return (
-    <button className={active ? "tab active" : "tab"} onClick={onClick}>
-      {children}
-    </button>
-  );
-}
-
-function HomeSkeleton() {
+function Home({ user }) {
   return (
     <>
-      <Section>
-        <h2>Home Feed</h2>
-        <p className="muted">
-          Newest listings & recommendations.
-        </p>
-      </Section>
+      <section className="card">
+        <h2>Home</h2>
+        {!user ? (
+          <p className="muted">Welcome! Browse featured listings below. Log in or register in the Account tab.</p>
+        ) : (
+          <p className="muted">Welcome back, <strong>{user.username}</strong>. Here are some featured listings.</p>
+        )}
+      </section>
+
       <div className="grid">
         {sampleItems.map((item) => (
           <div className="card" key={item.id}>
-            <img src={item.image} alt={item.title} className="thumb" style={{ width: "100%", height: "150px", objectFit: "cover", borderRadius: "10px" }} />
+            <img
+              src={item.image}
+              alt={item.title}
+              className="thumb"
+              style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 10 }}
+            />
             <div className="title">{item.title}</div>
             <div className="rowline">
               <span>${item.price.toFixed(2)}</span>
@@ -72,229 +111,279 @@ function HomeSkeleton() {
   );
 }
 
-function Users() {
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState("");
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
 
+function Account({ user, onLogin, onLogout }) {
+  const [mode, setMode] = useState(user ? "profile" : "login");
+
+  // login
+  const [loginIdentifier, setLoginIdentifier] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  // register
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regFullName, setRegFullName] = useState("");
 
-  function isStrongPassword(password) {
-    const pattern = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+={}[\]|:;"'<>,.?/~`]).{8,}$/;
-    return pattern.test(password);
-  }
+  // 2FA UI
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorMethod, setTwoFactorMethod] = useState("sms");
+  const [twoFactorSetupVisible, setTwoFactorSetupVisible] = useState(false);
 
-  async function login() {
-    if (!identifier || !password) {
-      setStatus("Username/email and password are required.");
-      return;
-    }
-    setLoading(true);
-    try {
-      // stub until backend auth exists
-      setUser({ username: identifier, admin: false });
-      setStatus("");
-    } catch (e) {
-      setStatus("Login failed: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [accountStatus, setAccountStatus] = useState("active");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
 
-  async function register() {
+  useEffect(() => {
+    setMode(user ? "profile" : "login");
+  }, [user]);
+
+  async function handleRegister(e) {
+    e.preventDefault();
+    setMessage("");
     if (!regUsername || !regEmail || !regPassword || !regFullName) {
-      setStatus("All fields are required.");
-      return;
+      setMessage("All fields are required."); return;
     }
     if (!isStrongPassword(regPassword)) {
-      setStatus(
-        "Password must be at least 8 characters long and include one uppercase letter, one number, and one special character."
-      );
-      return;
+      setMessage("Password must be at least 8 chars with uppercase, number, symbol."); return;
     }
+    setBusy(true);
     try {
-      await createUser({
-        username: regUsername,
-        email: regEmail,
-        password: regPassword,
-        full_name: regFullName, // ✅ kept as requested
+      const created = await api("/users/", {
+        method: "POST",
+        body: JSON.stringify({
+          username: regUsername,
+          email: regEmail,
+          password: regPassword,
+          full_name: regFullName,
+        }),
       });
-      setStatus("User created. You can now log in.");
-      setRegUsername("");
-      setRegEmail("");
-      setRegPassword("");
-      setRegFullName("");
-      setShowRegister(false);
-    } catch (e) {
-      setStatus(e.message);
+      onLogin(created);
+      setMessage("Account created and logged in.");
+      setRegUsername(""); setRegEmail(""); setRegPassword(""); setRegFullName("");
+    } catch (err) {
+      setMessage(String(err.message || err));
+    } finally {
+      setBusy(false);
     }
   }
 
-  if (user) {
-    return (
-      <div className="login-container">
-        <div className="login-card">
-          <Section title={`Welcome, ${user.username}`}>
-            <p>{user.admin ? "Admin access" : "Basic user access"}</p>
-          </Section>
-        </div>
-      </div>
+ async function handleLogin(e) {
+  e.preventDefault();
+  setMessage("");
+  if (!loginIdentifier || !loginPassword) {
+    setMessage("Email/username and password are required.");
+    return;
+  }
+  setBusy(true);
+  try {
+    const payload = await api("/users/?skip=0&limit=100");
+
+    // Normalize response to an array
+    const list = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.users)
+      ? payload.users
+      : Array.isArray(payload?.items)
+      ? payload.items
+      : null;
+
+    if (!Array.isArray(list)) {
+      throw new Error("Unexpected /users/ response shape.");
+    }
+
+    const ident = loginIdentifier.toLowerCase();
+    const match = list.find(
+      (u) =>
+        (u.email && String(u.email).toLowerCase() === ident) ||
+        (u.username && String(u.username).toLowerCase() === ident)
     );
+
+    if (!match) {
+      setMessage("User not found.");
+    } else {
+      onLogin(match);
+      setAccountStatus("active");
+      setMessage("Logged in.");
+    }
+  } catch (err) {
+    setMessage(String(err.message || err));
+  } finally {
+    setBusy(false);
+  }
+}
+
+
+  async function deleteAccount() {
+    if (!user?.id) { setMessage("No user id to delete."); return; }
+    if (!confirm("Delete your account permanently?")) return;
+    setBusy(true);
+    try {
+      await api(`/users/${user.id}`, { method: "DELETE" });
+      onLogout();
+      setMessage("Account deleted.");
+    } catch (err) {
+      setMessage(String(err.message || err));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (showRegister) {
+  function deactivateAccount() {
+    setAccountStatus("deactivated");
+    setMessage("Account marked deactivated (UI only).");
+  }
+  function openTwoFactorSetup() { setTwoFactorSetupVisible(true); }
+  function completeTwoFactorSetup() { setTwoFactorEnabled(true); setTwoFactorSetupVisible(false); setMessage("2FA enabled."); }
+  function disableTwoFactor() { setTwoFactorEnabled(false); setMessage("2FA disabled."); }
+
+  if (user && mode === "profile") {
     return (
-      <div className="login-container">
-        <div className="login-card">
-          <Section title="Register">
-            <Input label="Full Name" value={regFullName} onChange={(e) => setRegFullName(e.target.value)} />
-            <Input label="Username" value={regUsername} onChange={(e) => setRegUsername(e.target.value)} />
-            <Input label="Email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
-            <Input label="Password" type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} />
-            <div className="actions">
-              <button className="btn" onClick={register}>Register</button>
-              <button className="btn outline" onClick={() => setShowRegister(false)}>Back to Log In</button>
+      <section className="card">
+        <h2>Account</h2>
+        <p>Logged in as <strong>{user.username}</strong> <span className="muted">({user.email})</span></p>
+        <p className="muted">Status: {accountStatus}</p>
+
+        <div className="section-block">
+          <h3>Two-Factor Authentication</h3>
+          {!twoFactorEnabled && !twoFactorSetupVisible && (
+            <button className="btn" onClick={openTwoFactorSetup}>Enable 2FA</button>
+          )}
+          {twoFactorSetupVisible && (
+            <div className="panel">
+              <p>Select a method:</p>
+              <div className="row">
+                <label><input type="radio" name="method" value="sms" checked={twoFactorMethod==="sms"} onChange={(e)=>setTwoFactorMethod(e.target.value)}/> SMS</label>
+                <label><input type="radio" name="method" value="app" checked={twoFactorMethod==="app"} onChange={(e)=>setTwoFactorMethod(e.target.value)}/> Authenticator app</label>
+              </div>
+              <div className="row">
+                <button className="btn" onClick={completeTwoFactorSetup}>Confirm setup</button>
+                <button className="btn outline" onClick={()=>setTwoFactorSetupVisible(false)}>Cancel</button>
+              </div>
             </div>
-            <span className="muted">{status}</span>
-          </Section>
+          )}
+          {twoFactorEnabled && !twoFactorSetupVisible && (
+            <div className="row">
+              <span className="badge">2FA enabled</span>
+              <button className="btn outline" onClick={disableTwoFactor}>Disable 2FA</button>
+            </div>
+          )}
         </div>
-      </div>
+
+        <div className="section-block">
+          <h3>Account Actions</h3>
+          <div className="row">
+            <button className="btn outline" onClick={deactivateAccount}>Deactivate Account</button>
+            <button className="btn danger" onClick={deleteAccount}>Delete Account</button>
+            <button className="btn" onClick={onLogout}>Log Out</button>
+          </div>
+        </div>
+
+        {message && <p className="muted">{message}</p>}
+        {busy && <p className="muted">Working...</p>}
+      </section>
     );
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <Section title="Log In">
-          <Input label="Username or Email" value={identifier} onChange={(e) => setIdentifier(e.target.value)} />
-          <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <div className="actions">
-            <button className="btn" onClick={login} disabled={loading}>
-              {loading ? "Logging in..." : "Log In"}
-            </button>
-            <button className="btn outline" onClick={() => setShowRegister(true)}>
-              Register / Create User
-            </button>
-          </div>
-          <span className="muted">{status}</span>
-        </Section>
+    <section className="card">
+      <h2>Account</h2>
+      <div className="tabs-secondary">
+        <button className={(!user && mode==="login") ? "tab secondary active" : "tab secondary"} onClick={()=>{setMode("login"); setMessage("");}}>
+          Log In
+        </button>
+        <button className={(!user && mode==="register") ? "tab secondary active" : "tab secondary"} onClick={()=>{setMode("register"); setMessage("");}}>
+          Register
+        </button>
       </div>
-    </div>
+
+      {mode === "login" && (
+        <form className="form" onSubmit={handleLogin}>
+          <label className="lbl">Username or Email
+            <input className="input" value={loginIdentifier} onChange={(e)=>setLoginIdentifier(e.target.value)} />
+          </label>
+          <label className="lbl">Password
+            <input type="password" className="input" value={loginPassword} onChange={(e)=>setLoginPassword(e.target.value)} />
+          </label>
+          <button className="btn" type="submit" disabled={busy}>{busy ? "Logging in..." : "Log In"}</button>
+          {message && <p className="muted">{message}</p>}
+        </form>
+      )}
+
+      {mode === "register" && (
+        <form className="form" onSubmit={handleRegister}>
+          <label className="lbl">Full Name
+            <input className="input" value={regFullName} onChange={(e)=>setRegFullName(e.target.value)} />
+          </label>
+          <label className="lbl">Username
+            <input className="input" value={regUsername} onChange={(e)=>setRegUsername(e.target.value)} />
+          </label>
+          <label className="lbl">Email
+            <input className="input" type="email" value={regEmail} onChange={(e)=>setRegEmail(e.target.value)} />
+          </label>
+          <label className="lbl">Password
+            <input className="input" type="password" value={regPassword} onChange={(e)=>setRegPassword(e.target.value)} />
+          </label>
+          <button className="btn" type="submit" disabled={busy}>{busy ? "Creating..." : "Create Account"}</button>
+          {message && <p className="muted">{message}</p>}
+        </form>
+      )}
+    </section>
   );
 }
 
 function Items() {
   const [items, setItems] = useState([]);
   const [skip, setSkip] = useState(0);
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState(20);
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function loadItems() {
+    setLoading(true);
+    setStatus("");
     try {
-      const data = await listItems(Number(skip), Number(limit));
+      const data = await api(`/items/?skip=${Number(skip)}&limit=${Number(limit)}`);
       setItems(data);
-    } catch (e) {
-      setStatus(e.message);
+    } catch (err) {
+      setStatus(String(err.message || err));
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function handleDeleteItem(id) {
-    if (!confirm(`Delete item #${id}?`)) return;
-    try {
-      await deleteItemApi(id);
-      setStatus(`Deleted item ${id}`);
-      await loadItems();
-    } catch (e) {
-      setStatus(e.message);
-    }
-  }
-
-  useEffect(() => {
-    loadItems().catch((e) => setStatus(e.message));
-  }, []);
+  useEffect(() => { loadItems(); }, []);
 
   return (
-    <>
-      <Section title="All Items">
-        <div className="row2">
-          <Input label="Skip" type="number" value={skip} onChange={(e) => setSkip(e.target.value)} />
-          <Input label="Limit" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} />
-        </div>
-        <div className="actions">
-          <button className="btn outline" onClick={loadItems}>Load</button>
-          <span className="muted">{status}</span>
-        </div>
-      </Section>
-
+    <section className="card">
+      <h2>Items</h2>
+      <div className="row">
+        <label className="lbl-inline">Skip
+          <input className="input small" type="number" value={skip} onChange={(e)=>setSkip(e.target.value)} />
+        </label>
+        <label className="lbl-inline">Limit
+          <input className="input small" type="number" value={limit} onChange={(e)=>setLimit(e.target.value)} />
+        </label>
+        <button className="btn" onClick={loadItems} disabled={loading}>{loading ? "Loading..." : "Reload"}</button>
+      </div>
+      {status && <p className="muted">{status}</p>}
       <div className="grid">
         {items.map((it) => (
-          <div className="card" key={it.id}>
-            <div className="thumb" />
-            <div className="title">{it.name}</div>
-            <div className="rowline">
-              <span>${(it.price_estimate ?? 0).toFixed(2)}</span>
-              <span className="badge">owner #{it.owner_id}</span>
-            </div>
-            <div className="actions">
-              <button className="btn outline" onClick={() => handleDeleteItem(it.id)}>Delete</button>
+          <div key={it.id} className="card inner">
+            <div className="title">{it.name} <span className="muted">#{it.id}</span></div>
+            <p className="muted">{it.description || "No description."}</p>
+            <div className="row">
+              <span className="badge">${typeof it.price_estimate === "number" ? it.price_estimate.toFixed(2) : "—"}</span>
+              <span className="muted">owner #{it.owner_id}</span>
             </div>
           </div>
         ))}
-        {!items.length && <div className="muted">No items found.</div>}
+        {!items.length && !loading && <p className="muted">No items found.</p>}
       </div>
-    </>
+    </section>
   );
 }
 
-export default function App() {
-  const [tab, setTab] = useState("home");
-  const [showModal, setShowModal] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  return (
-    <div>
-      <header className="header">
-        <nav className="nav">
-          <div className="brand">SwapStop</div>
-          <div className="header-search">
-            <input
-              type="text"
-              placeholder="Search items..."
-              className="header-search-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && searchQuery.trim() !== "") {
-                  setTab("search");
-                }
-              }}
-            />
-          </div>
-          <div className="spacer" />
-          <TabButton active={tab === "home"} onClick={() => setTab("home")}>
-            Home
-          </TabButton>
-          <TabButton active={tab === "users"} onClick={() => setTab("users")}>
-            <User size={20} />
-          </TabButton>
-          <TabButton active={tab === "items"} onClick={() => setTab("items")}>
-            Items
-          </TabButton>
-        </nav>
-      </header>
-
-      <main className="wrap">
-        {tab === "home" && <HomeSkeleton />}
-        {tab === "users" && <Users />}
-        {tab === "items" && <Items />}
-        <footer className="footer">© 2025 SwapStop</footer>
-      </main>
-    </div>
-  );
+function isStrongPassword(pw) {
+  return pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
 }
