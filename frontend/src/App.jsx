@@ -24,22 +24,45 @@ async function api(path, options = {}) {
   const normalized = (path.startsWith("/") ? path : `/${path}`);
   const url = `${API_BASE}${API_PREFIX}${normalized}`;
 
+  const token = window.localStorage.getItem("access_token") || null;
+
+  const mergedHeaders = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(options.headers || {}),
+  };
+  if (token) {
+    mergedHeaders.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
     ...options,
+    headers: mergedHeaders,
   });
 
   const raw = await res.text();
   let data = null;
-  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw || null; }
+  try { data = raw ? JSON.parse(raw) : null; 
+
+  } catch { data = raw || null; }
 
   if (!res.ok) {
     const detail = typeof data === "string" ? data : JSON.stringify(data);
     throw new Error(`[${res.status} ${res.statusText}] ${detail} @ ${url}`);
   }
+
   return data;
 }
 
+function getArray(payload, key){
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.[key])) return payload[key];
+  return[];
+}
+
+function fmtMoney(n) {
+  return typeof n === "number" ? n.toFixed(2) : "-";
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -71,7 +94,7 @@ export default function App() {
             onLogout={() => { setUser(null); setActiveTab("home"); }} // go Home after logout/delete
           />
         )}
-        {activeTab === "items" && <Items />}
+        {activeTab === "items" && <Items user={user} />}
       </main>
     </div>
   );
@@ -171,41 +194,42 @@ function Account({ user, onLogin, onLogout }) {
  async function handleLogin(e) {
   e.preventDefault();
   setMessage("");
+
   if (!loginIdentifier || !loginPassword) {
     setMessage("Email/username and password are required.");
     return;
   }
+
   setBusy(true);
   try {
-    const payload = await api("/users/?skip=0&limit=100");
+    // request token using form-encoded body
+    const form = new URLSearchParams();
+    form.append("username", loginIdentifier);
+    form.append("password", loginPassword);
+    form.append("grant_type", "password");
 
-    // Normalize response to an array
-    const list = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.users)
-      ? payload.users
-      : Array.isArray(payload?.items)
-      ? payload.items
-      : null;
+    const tokenRes = await fetch(`${API_BASE}${API_PREFIX}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
 
-    if (!Array.isArray(list)) {
-      throw new Error("Unexpected /users/ response shape.");
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      throw new Error(`[${tokenRes.status}] ${errText}`);
     }
 
-    const ident = loginIdentifier.toLowerCase();
-    const match = list.find(
-      (u) =>
-        (u.email && String(u.email).toLowerCase() === ident) ||
-        (u.username && String(u.username).toLowerCase() === ident)
-    );
-
-    if (!match) {
-      setMessage("User not found.");
-    } else {
-      onLogin(match);
-      setAccountStatus("active");
-      setMessage("Logged in.");
+    const tokenPayload = await tokenRes.json();
+    if (!tokenPayload.access_token) {
+      throw new Error("No access_token in /token response.");
     }
+
+    window.localStorage.setItem("access_token", tokenPayload.access_token);
+
+    const me = await api("/users/me");
+    onLogin(me);
+    setAccountStatus("active");
+    setMessage("Logged in.");
   } catch (err) {
     setMessage(String(err.message || err));
   } finally {
@@ -220,6 +244,7 @@ function Account({ user, onLogin, onLogout }) {
     setBusy(true);
     try {
       await api(`/users/${user.id}`, { method: "DELETE" });
+      window.localStorage.removeItem("access_token");
       onLogout();
       setMessage("Account deleted.");
     } catch (err) {
@@ -228,6 +253,12 @@ function Account({ user, onLogin, onLogout }) {
       setBusy(false);
     }
   }
+
+  function fullLogout() {
+    window.localStorage.removeItem("access_token");
+    onLogout();
+  }
+
 
   function deactivateAccount() {
     setAccountStatus("deactivated");
@@ -275,7 +306,16 @@ function Account({ user, onLogin, onLogout }) {
           <div className="row">
             <button className="btn outline" onClick={deactivateAccount}>Deactivate Account</button>
             <button className="btn danger" onClick={deleteAccount}>Delete Account</button>
-            <button className="btn" onClick={onLogout}>Log Out</button>
+            <button
+              className="btn"
+              onClick={() => {
+                window.localStorage.removeItem("access_token");
+                fullLogout();
+              }}
+            >
+              Log Out
+            </button>
+
           </div>
         </div>
 
@@ -332,57 +372,342 @@ function Account({ user, onLogin, onLogout }) {
   );
 }
 
-function Items() {
-  const [items, setItems] = useState([]);
-  const [skip, setSkip] = useState(0);
-  const [limit, setLimit] = useState(20);
+function Items({ user }) {
+  const [mode, setMode] = useState("browse"); // 'browse' | 'create' | 'user'
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function loadItems() {
+  // browse
+  const [items, setItems] = useState([]);
+  const [skip, setSkip] = useState(0);
+  const [limit, setLimit] = useState(20);
+
+  // create
+  const [ownerId, setOwnerId] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+
+  // user items
+  const [users, setUsers] = useState([]);
+  const [userFilterId, setUserFilterId] = useState("");
+  const [userItems, setUserItems] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  async function loadAllItems() {
     setLoading(true);
     setStatus("");
     try {
-      const data = await api(`/items/?skip=${Number(skip)}&limit=${Number(limit)}`);
-      setItems(data);
-    } catch (err) {
-      setStatus(String(err.message || err));
+      const payload = await api(`/items/?skip=${Number(skip)}&limit=${Number(limit)}`);
+      setItems(getArray(payload, "items"));
+    } catch (e) {
+      setStatus(String(e.message || e));
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { loadItems(); }, []);
+  async function loadUsers() {
+    setLoadingUsers(true);
+    try {
+      const payload = await api(`/users/?skip=0&limit=100`);
+      setUsers(getArray(payload, "users"));
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  async function loadItemsForUser(uid) {
+    if (!uid) return;
+    setLoading(true);
+    setStatus("");
+    try {
+      const payload = await api(`/users/${uid}/items/`);
+      setUserItems(getArray(payload, "items"));
+    } catch (e) {
+      setStatus(String(e.message || e));
+      setUserItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // auto-fill ownerId when logged-in user is present and Create tab is active
+  useEffect(() => {
+    if (mode === "create" && user?.id) {
+      setOwnerId(String(user.id));
+    }
+    if (mode === "create" && !user?.id) {
+      setOwnerId("");
+    }
+  }, [mode, user]);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    setStatus("");
+
+    const ownerNumeric = Number(ownerId);
+
+    if (!ownerId || !Number.isFinite(ownerNumeric)) {
+      setStatus("Owner ID must be a valid number (e.g., 1).");
+      return;
+    }
+    if (!name) {
+      setStatus("Name is required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const body = {
+        name,
+        description: description || undefined,
+        price_estimate: price ? Number(price) : undefined,
+      };
+
+      await api(`/users/${ownerNumeric}/items/`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      setName("");
+      setDescription("");
+      setPrice("");
+      setStatus("Item created.");
+
+      if (mode === "browse") await loadAllItems();
+      if (mode === "user" && userFilterId) await loadItemsForUser(userFilterId);
+    } catch (e) {
+      setStatus(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(itemId) {
+    if (!confirm(`Delete item #${itemId}?`)) return;
+    setLoading(true);
+    setStatus("");
+    try {
+      await api(`/items/${itemId}`, { method: "DELETE" });
+      setStatus(`Deleted item ${itemId}.`);
+      if (mode === "browse") await loadAllItems();
+      if (mode === "user" && userFilterId) await loadItemsForUser(userFilterId);
+    } catch (e) {
+      setStatus(String(e.message || e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAllItems();
+  }, []);
+
+  useEffect(() => {
+    if (mode === "user" && users.length === 0) loadUsers();
+  }, [mode]);
 
   return (
     <section className="card">
       <h2>Items</h2>
-      <div className="row">
-        <label className="lbl-inline">Skip
-          <input className="input small" type="number" value={skip} onChange={(e)=>setSkip(e.target.value)} />
-        </label>
-        <label className="lbl-inline">Limit
-          <input className="input small" type="number" value={limit} onChange={(e)=>setLimit(e.target.value)} />
-        </label>
-        <button className="btn" onClick={loadItems} disabled={loading}>{loading ? "Loading..." : "Reload"}</button>
+
+      <div className="tabs-secondary" style={{ marginBottom: 12 }}>
+        <button
+          className={mode === "browse" ? "tab secondary active" : "tab secondary"}
+          onClick={() => setMode("browse")}
+        >
+          Browse
+        </button>
+        <button
+          className={mode === "create" ? "tab secondary active" : "tab secondary"}
+          onClick={() => setMode("create")}
+        >
+          Create
+        </button>
+        <button
+          className={mode === "user" ? "tab secondary active" : "tab secondary"}
+          onClick={() => setMode("user")}
+        >
+          By User
+        </button>
       </div>
+
       {status && <p className="muted">{status}</p>}
-      <div className="grid">
-        {items.map((it) => (
-          <div key={it.id} className="card inner">
-            <div className="title">{it.name} <span className="muted">#{it.id}</span></div>
-            <p className="muted">{it.description || "No description."}</p>
-            <div className="row">
-              <span className="badge">${typeof it.price_estimate === "number" ? it.price_estimate.toFixed(2) : "—"}</span>
-              <span className="muted">owner #{it.owner_id}</span>
-            </div>
+
+      {mode === "browse" && (
+        <>
+          <div className="row">
+            <label className="lbl-inline">
+              Skip
+              <input
+                className="input small"
+                type="number"
+                value={skip}
+                onChange={(e) => setSkip(e.target.value)}
+              />
+            </label>
+            <label className="lbl-inline">
+              Limit
+              <input
+                className="input small"
+                type="number"
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+              />
+            </label>
+            <button className="btn" onClick={loadAllItems} disabled={loading}>
+              {loading ? "Loading..." : "Reload"}
+            </button>
           </div>
-        ))}
-        {!items.length && !loading && <p className="muted">No items found.</p>}
-      </div>
+
+          <div className="grid">
+            {items.map((it) => (
+              <div key={it.id} className="card inner">
+                <div className="title">
+                  {it.name} <span className="muted">#{it.id}</span>
+                </div>
+                <p className="muted">{it.description || "No description."}</p>
+                <div className="row">
+                  <span className="badge">${fmtMoney(it.price_estimate)}</span>
+                  <span className="muted">owner #{it.owner_id}</span>
+                </div>
+                <div className="row" style={{ justifyContent: "flex-end" }}>
+                  <button className="btn outline" onClick={() => handleDelete(it.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!items.length && !loading && <p className="muted">No items found.</p>}
+          </div>
+        </>
+      )}
+
+      {mode === "create" && (
+        <form className="form" onSubmit={handleCreate}>
+          {user?.id ? (
+            <p className="muted">
+              Owner: <strong>{user.username}</strong> (#{user.id})
+            </p>
+          ) : (
+            <div className="row">
+              <label className="lbl-inline" style={{ flex: 1 }}>
+                Owner ID
+                <input
+                  className="input"
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  placeholder="User ID"
+                />
+              </label>
+            </div>
+          )}
+          <div className="row">
+            <label className="lbl-inline" style={{ flex: 2 }}>
+              Name
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Item name"
+              />
+            </label>
+          </div>
+          <label className="lbl">
+            Description
+            <input
+              className="input"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+          <label className="lbl">
+            Price Estimate
+            <input
+              className="input"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Optional number"
+            />
+          </label>
+          <div className="row">
+            <button className="btn" type="submit" disabled={loading}>
+              {loading ? "Creating..." : "Create Item"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {mode === "user" && (
+        <>
+          <div className="row">
+            <label className="lbl-inline" style={{ minWidth: 220 }}>
+              Select User
+              <select
+                className="input"
+                disabled={loadingUsers}
+                value={userFilterId}
+                onChange={(e) => setUserFilterId(e.target.value)}
+              >
+                <option value="">— choose —</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.username} (#{u.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="lbl-inline" style={{ minWidth: 180 }}>
+              Or enter ID
+              <input
+                className="input"
+                placeholder="e.g. 1"
+                value={userFilterId}
+                onChange={(e) => setUserFilterId(e.target.value)}
+              />
+            </label>
+            <button
+              className="btn"
+              onClick={() => loadItemsForUser(Number(userFilterId))}
+              disabled={loading || !userFilterId}
+            >
+              {loading ? "Loading..." : "Load"}
+            </button>
+          </div>
+
+          <div className="grid">
+            {userItems.map((it) => (
+              <div key={it.id} className="card inner">
+                <div className="title">
+                  {it.name} <span className="muted">#{it.id}</span>
+                </div>
+                <p className="muted">{it.description || "No description."}</p>
+                <div className="row">
+                  <span className="badge">${fmtMoney(it.price_estimate)}</span>
+                  <span className="muted">owner #{it.owner_id}</span>
+                </div>
+                <div className="row" style={{ justifyContent: "flex-end" }}>
+                  <button className="btn outline" onClick={() => handleDelete(it.id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!userItems.length && !loading && userFilterId && (
+              <p className="muted">No items found for user #{userFilterId}.</p>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }
+
+
 
 function isStrongPassword(pw) {
   return pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
