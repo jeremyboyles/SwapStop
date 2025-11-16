@@ -1,5 +1,5 @@
 # app/models.py
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, Boolean
 from sqlalchemy.orm import relationship
 from .database import Base
 from datetime import datetime
@@ -11,6 +11,7 @@ class User(Base):
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
+    balance = Column(Float, default=100.0)  #starting balance
 
     items = relationship("Item", back_populates="owner", cascade="all, delete-orphan")
 
@@ -23,6 +24,7 @@ class Item(Base):
     name = Column(String(150), index=True, nullable=False)
     description = Column(String, nullable=True)
     price_estimate = Column(Float, nullable=True)
+    is_available = Column(Boolean, default=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="items")
