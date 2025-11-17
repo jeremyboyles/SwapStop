@@ -1,22 +1,29 @@
-version: "3.9"
-
 services:
   backend:
-    build: ./app
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     container_name: swapstop-backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app
     environment:
-      - DATABASE_URL=sqlite:///./swapstop.db
-    restart: unless-stopped
+      SECRET_KEY: "super-secret-key-change-this"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "10080"
+    networks:
+      - swapnet
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     container_name: swapstop-frontend
     ports:
-      - "5173:80"
+      - "5173:5173"
     depends_on:
       - backend
-    restart: unless-stopped
+    networks:
+      - swapnet
+
+networks:
+  swapnet:
+    driver: bridge

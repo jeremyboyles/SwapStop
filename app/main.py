@@ -1,14 +1,13 @@
-# app/main.py
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-
-from . import models, schemas, crud, database, security
-from .database import engine
 from datetime import timedelta
-
 from fastapi.middleware.cors import CORSMiddleware
+
+# Correct absolute imports
+from app import models, schemas, crud, database, security
+from app.database import engine
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
