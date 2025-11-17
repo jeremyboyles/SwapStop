@@ -8,9 +8,16 @@ class ItemBase(BaseModel):
     name: str
     description: Optional[str] = None
     price_estimate: Optional[float] = None
+    is_available: Optional[bool] = True
 
 class ItemCreate(ItemBase):
     pass
+
+class ItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price_estimate: Optional[float] = None
+    is_available: Optional[bool] = None
 
 class Item(ItemBase):
     id: int
@@ -25,8 +32,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    balance: Optional[float] = None
+
 class User(UserBase):
     id: int
+    balance: float
     items: List[Item] = []
 
     model_config = {"from_attributes": True}

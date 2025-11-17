@@ -79,6 +79,13 @@ def read_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
 def read_current_user(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.put("/users/{user_id}", response_model=schemas.User)
+def update_user(user_id: int, updates: schemas.UserUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_user(db, user_id, updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return updated
+
 @app.delete("/users/{user_id}", status_code=200)
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # only allow users to delete their own account (or extend for admin)
@@ -122,6 +129,13 @@ def read_item(item_id: int, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
+
+@app.put("/items/{item_id}", response_model=schemas.Item)
+def update_item(item_id: int, updates: schemas.ItemUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_item(db, item_id, updates)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return updated
 
 @app.delete("/items/{item_id}", response_model=schemas.Item)
 def delete_item(item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -168,3 +182,12 @@ def respond_trade(trade_id: int, action: schemas.TradeStatusStr, db: Session = D
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
     return updated
+
+# ---------------- BUY ITEMS ----------------
+# TODO: add payment w/ stripe or paypal
+@app.post("/buy/{buyer_id}/{item_id}", response_model=schemas.Item)
+def buy_item(buyer_id: int, item_id: int, db: Session = Depends(get_db)):
+    item, msg = crud.buy_item(db, buyer_id, item_id)
+    if not item:
+        raise HTTPException(status_code=400, detail=msg)
+    return item
